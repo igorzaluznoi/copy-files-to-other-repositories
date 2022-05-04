@@ -15948,10 +15948,11 @@ async function getListOfFilesToReplicate(octokit, commitId, owner, repo, pattern
   if (triggerEventName === 'workflow_dispatch') {
     const root = process.cwd();
 
-    filesToCheckForReplication = await recursive(root, [".git"]).map(file => {
+    filesToCheckForReplication = await recursive(root, [".git"]);
+    filesToCheckForReplication = filesToCheckForReplication.map(file => {
       return file.replace(root, '');
   });
-
+  
     core.debug(`DEBUG: list of files from the repo is ${filesToCheckForReplication}`);
   }
 
