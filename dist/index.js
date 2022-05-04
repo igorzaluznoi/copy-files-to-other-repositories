@@ -23400,6 +23400,7 @@ function inspect(obj) {
 
 function createConfig(env = {}) {
   function parseMergeLabels(str, defaultValue) {
+    log("ERROR", "labels value is: " + str);
     const arr = (str == null ? defaultValue : str)
       .split(",")
       .map(s => s.trim());
