@@ -17915,6 +17915,7 @@ const path = __webpack_require__(622);
 const { mkdir } = __webpack_require__(747).promises;
 const { retry } = __webpack_require__(298);
 const { GitHub, getOctokitOptions } = __webpack_require__(30);
+const { createConfig } = __webpack_require__(979);
 
 
 const { merge } = __webpack_require__(452);
@@ -18075,8 +18076,12 @@ async function run() {
                 });
                 
                 core.info(`Attempting to auto-merge the Pull Request (# ${pr.number}) for ${repo.name}`);
-                const mergeResult = await merge(context, pullRequest);
 
+                const config = createConfig({
+                  MERGE_DELETE_BRANCH: true
+                });
+
+                const mergeResult = await merge({ config, myOctokit }, pullRequest);
 
               } else {
                 core.info(`Unable to create a PR because of timeouts. Create Pull Request manually from the branch ${newBranchName} that was already created in the upstream`);
