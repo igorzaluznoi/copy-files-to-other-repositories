@@ -18068,7 +18068,7 @@ async function run() {
                 
                 core.info(`Attempting to auto-merge the Pull Request (# ${pr.number}) for ${repo.name}`);
 
-                const config = createConfig();
+                const config = createConfig(process.env);
                 await merge({ config, octokit: octokit }, pullRequest);
 
               } else {
