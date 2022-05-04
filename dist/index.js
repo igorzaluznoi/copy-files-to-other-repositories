@@ -23328,6 +23328,7 @@ function regExpEscape (s) {
 /* 979 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
+const core = __webpack_require__(186);
 const util = __webpack_require__(669);
 const fse = __webpack_require__(630);
 const tmp = __webpack_require__(517);
