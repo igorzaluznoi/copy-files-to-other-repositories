@@ -18063,7 +18063,7 @@ async function run() {
               core.endGroup();
           
               if (pr) {
-                core.info(`Workflow finished with success and PR for ${repo.name} is created -> ${pr['url']}`);
+                core.info(`Workflow finished with success and PR for ${repo.name} is created  (# ${pr['id']}) -> ${pr['url']}`);
 
                 let { data: pullRequest } = await myOctokit.pulls.get({
                   owner: repo.owner,
@@ -18072,7 +18072,7 @@ async function run() {
                   headers: { "If-None-Match": "" }
                 });
                 
-
+                core.info(`Attempting to automerge the PR (# ${pr['id']}) for ${repo.name}`);
                 const mergeResult = await merge(context, pullRequest);
 
 
