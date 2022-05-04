@@ -1,4 +1,4 @@
-name: Copy Files to Other Repositories
+name: Global Workflows Replication
 description: This action enables you to copy/replicate from one repo to another automatically.
 inputs:
   github_token:
