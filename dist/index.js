@@ -18082,7 +18082,7 @@ async function run() {
                   MERGE_LABELS: ""
                 });
 
-                const mergeResult = await merge({ config, myOctokit: octokit }, pullRequest);
+                const mergeResult = await merge({ config, octokit: octokit }, pullRequest);
 
               } else {
                 core.info(`Unable to create a PR because of timeouts. Create Pull Request manually from the branch ${newBranchName} that was already created in the upstream`);
