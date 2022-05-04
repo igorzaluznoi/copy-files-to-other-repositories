@@ -2652,7 +2652,7 @@ async function createPr(octokit, branchName, id, commitMessage, defaultBranch) {
         repositoryId: $id
       }){
         pullRequest {
-          id
+          number
           url
         }
       }
@@ -18068,11 +18068,11 @@ async function run() {
                 let { data: pullRequest } = await myOctokit.pulls.get({
                   owner: repo.owner,
                   repo: repo.name,
-                  pull_number: pr.id,
+                  pull_number: pr.number,
                   headers: { "If-None-Match": "" }
                 });
                 
-                core.info(`Attempting to automerge the PR (# ${pr['id']}) for ${repo.name}`);
+                core.info(`Attempting to automerge the PR (# ${pr['number']}) for ${repo.name}`);
                 const mergeResult = await merge(context, pullRequest);
 
 
@@ -18087,7 +18087,7 @@ async function run() {
         }
       } catch (error) {
         core.endGroup();
-        core.warning(`Failed replicating files for this repo: ${error}`);
+        core.warning(`Failed replicating files for repo ${repo.name} with error: ${error}`);
         continue;
       }
     }
