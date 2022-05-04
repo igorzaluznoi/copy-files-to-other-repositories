@@ -18063,7 +18063,7 @@ async function run() {
               core.endGroup();
           
               if (pr) {
-                core.info(`Workflow finished with success and PR for ${repo.name} is created  (# ${pr['id']}) -> ${pr['url']}`);
+                core.info(`Workflow finished with success and PR for ${repo.name} is created  (# ${pr['number']}) -> ${pr['url']}`);
 
                 let { data: pullRequest } = await myOctokit.pulls.get({
                   owner: repo.owner,
