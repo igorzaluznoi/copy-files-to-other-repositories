@@ -2130,7 +2130,7 @@ module.exports = require("child_process");
 "use strict";
 
 const u = __webpack_require__(46).fromPromise
-const fs = __webpack_require__(274)
+const fs = __webpack_require__(176)
 
 function pathExists (path) {
   return fs.access(path).then(() => true).catch(() => false)
@@ -4089,9 +4089,137 @@ exports.cloneMirrorTask = cloneMirrorTask;
 /***/ }),
 
 /***/ 176:
-/***/ (function(module) {
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
 
-module.exports = eval("require")("./common");
+"use strict";
+
+// This is adapted from https://github.com/normalize/mz
+// Copyright (c) 2014-2016 Jonathan Ong me@jongleberry.com and Contributors
+const u = __webpack_require__(46).fromCallback
+const fs = __webpack_require__(758)
+
+const api = [
+  'access',
+  'appendFile',
+  'chmod',
+  'chown',
+  'close',
+  'copyFile',
+  'fchmod',
+  'fchown',
+  'fdatasync',
+  'fstat',
+  'fsync',
+  'ftruncate',
+  'futimes',
+  'lchmod',
+  'lchown',
+  'link',
+  'lstat',
+  'mkdir',
+  'mkdtemp',
+  'open',
+  'opendir',
+  'readdir',
+  'readFile',
+  'readlink',
+  'realpath',
+  'rename',
+  'rmdir',
+  'stat',
+  'symlink',
+  'truncate',
+  'unlink',
+  'utimes',
+  'writeFile'
+].filter(key => {
+  // Some commands are not available on some systems. Ex:
+  // fs.opendir was added in Node.js v12.12.0
+  // fs.lchown is not available on at least some Linux
+  return typeof fs[key] === 'function'
+})
+
+// Export all keys:
+Object.keys(fs).forEach(key => {
+  if (key === 'promises') {
+    // fs.promises is a getter property that triggers ExperimentalWarning
+    // Don't re-export it here, the getter is defined in "lib/index.js"
+    return
+  }
+  exports[key] = fs[key]
+})
+
+// Universalify async methods:
+api.forEach(method => {
+  exports[method] = u(fs[method])
+})
+
+// We differ from mz/fs in that we still ship the old, broken, fs.exists()
+// since we are a drop-in replacement for the native module
+exports.exists = function (filename, callback) {
+  if (typeof callback === 'function') {
+    return fs.exists(filename, callback)
+  }
+  return new Promise(resolve => {
+    return fs.exists(filename, resolve)
+  })
+}
+
+// fs.read(), fs.write(), & fs.writev() need special treatment due to multiple callback args
+
+exports.read = function (fd, buffer, offset, length, position, callback) {
+  if (typeof callback === 'function') {
+    return fs.read(fd, buffer, offset, length, position, callback)
+  }
+  return new Promise((resolve, reject) => {
+    fs.read(fd, buffer, offset, length, position, (err, bytesRead, buffer) => {
+      if (err) return reject(err)
+      resolve({ bytesRead, buffer })
+    })
+  })
+}
+
+// Function signature can be
+// fs.write(fd, buffer[, offset[, length[, position]]], callback)
+// OR
+// fs.write(fd, string[, position[, encoding]], callback)
+// We need to handle both cases, so we use ...args
+exports.write = function (fd, buffer, ...args) {
+  if (typeof args[args.length - 1] === 'function') {
+    return fs.write(fd, buffer, ...args)
+  }
+
+  return new Promise((resolve, reject) => {
+    fs.write(fd, buffer, ...args, (err, bytesWritten, buffer) => {
+      if (err) return reject(err)
+      resolve({ bytesWritten, buffer })
+    })
+  })
+}
+
+// fs.writev only available in Node v12.9.0+
+if (typeof fs.writev === 'function') {
+  // Function signature is
+  // s.writev(fd, buffers[, position], callback)
+  // We need to handle the optional arg, so we use ...args
+  exports.writev = function (fd, buffers, ...args) {
+    if (typeof args[args.length - 1] === 'function') {
+      return fs.writev(fd, buffers, ...args)
+    }
+
+    return new Promise((resolve, reject) => {
+      fs.writev(fd, buffers, ...args, (err, bytesWritten, buffers) => {
+        if (err) return reject(err)
+        resolve({ bytesWritten, buffers })
+      })
+    })
+  }
+}
+
+// fs.realpath.native only available in Node v9.2+
+if (typeof fs.realpath.native === 'function') {
+  exports.realpath.native = u(fs.realpath.native)
+}
 
 
 /***/ }),
@@ -6721,7 +6849,7 @@ exports.parseBranchSummary = parseBranchSummary;
 // The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-const fs = __webpack_require__(274)
+const fs = __webpack_require__(176)
 const path = __webpack_require__(622)
 const atLeastNode = __webpack_require__(995)
 
@@ -6860,142 +6988,6 @@ module.exports.makeDirSync = (input, options) => {
 
 /***/ }),
 
-/***/ 274:
-/***/ (function(__unusedmodule, exports, __webpack_require__) {
-
-"use strict";
-
-// This is adapted from https://github.com/normalize/mz
-// Copyright (c) 2014-2016 Jonathan Ong me@jongleberry.com and Contributors
-const u = __webpack_require__(46).fromCallback
-const fs = __webpack_require__(758)
-
-const api = [
-  'access',
-  'appendFile',
-  'chmod',
-  'chown',
-  'close',
-  'copyFile',
-  'fchmod',
-  'fchown',
-  'fdatasync',
-  'fstat',
-  'fsync',
-  'ftruncate',
-  'futimes',
-  'lchmod',
-  'lchown',
-  'link',
-  'lstat',
-  'mkdir',
-  'mkdtemp',
-  'open',
-  'opendir',
-  'readdir',
-  'readFile',
-  'readlink',
-  'realpath',
-  'rename',
-  'rmdir',
-  'stat',
-  'symlink',
-  'truncate',
-  'unlink',
-  'utimes',
-  'writeFile'
-].filter(key => {
-  // Some commands are not available on some systems. Ex:
-  // fs.opendir was added in Node.js v12.12.0
-  // fs.lchown is not available on at least some Linux
-  return typeof fs[key] === 'function'
-})
-
-// Export all keys:
-Object.keys(fs).forEach(key => {
-  if (key === 'promises') {
-    // fs.promises is a getter property that triggers ExperimentalWarning
-    // Don't re-export it here, the getter is defined in "lib/index.js"
-    return
-  }
-  exports[key] = fs[key]
-})
-
-// Universalify async methods:
-api.forEach(method => {
-  exports[method] = u(fs[method])
-})
-
-// We differ from mz/fs in that we still ship the old, broken, fs.exists()
-// since we are a drop-in replacement for the native module
-exports.exists = function (filename, callback) {
-  if (typeof callback === 'function') {
-    return fs.exists(filename, callback)
-  }
-  return new Promise(resolve => {
-    return fs.exists(filename, resolve)
-  })
-}
-
-// fs.read(), fs.write(), & fs.writev() need special treatment due to multiple callback args
-
-exports.read = function (fd, buffer, offset, length, position, callback) {
-  if (typeof callback === 'function') {
-    return fs.read(fd, buffer, offset, length, position, callback)
-  }
-  return new Promise((resolve, reject) => {
-    fs.read(fd, buffer, offset, length, position, (err, bytesRead, buffer) => {
-      if (err) return reject(err)
-      resolve({ bytesRead, buffer })
-    })
-  })
-}
-
-// Function signature can be
-// fs.write(fd, buffer[, offset[, length[, position]]], callback)
-// OR
-// fs.write(fd, string[, position[, encoding]], callback)
-// We need to handle both cases, so we use ...args
-exports.write = function (fd, buffer, ...args) {
-  if (typeof args[args.length - 1] === 'function') {
-    return fs.write(fd, buffer, ...args)
-  }
-
-  return new Promise((resolve, reject) => {
-    fs.write(fd, buffer, ...args, (err, bytesWritten, buffer) => {
-      if (err) return reject(err)
-      resolve({ bytesWritten, buffer })
-    })
-  })
-}
-
-// fs.writev only available in Node v12.9.0+
-if (typeof fs.writev === 'function') {
-  // Function signature is
-  // s.writev(fd, buffers[, position], callback)
-  // We need to handle the optional arg, so we use ...args
-  exports.writev = function (fd, buffers, ...args) {
-    if (typeof args[args.length - 1] === 'function') {
-      return fs.writev(fd, buffers, ...args)
-    }
-
-    return new Promise((resolve, reject) => {
-      fs.writev(fd, buffers, ...args, (err, bytesWritten, buffers) => {
-        if (err) return reject(err)
-        resolve({ bytesWritten, buffers })
-      })
-    })
-  }
-}
-
-// fs.realpath.native only available in Node v9.2+
-if (typeof fs.realpath.native === 'function') {
-  exports.realpath.native = u(fs.realpath.native)
-}
-
-
-/***/ }),
-
 /***/ 278:
 /***/ (function(__unusedmodule, exports) {
 
@@ -7019,6 +7011,14 @@ function toCommandValue(input) {
 }
 exports.toCommandValue = toCommandValue;
 //# sourceMappingURL=utils.js.map
+
+/***/ }),
+
+/***/ 282:
+/***/ (function(module) {
+
+module.exports = eval("require")("tmp");
+
 
 /***/ }),
 
@@ -9230,7 +9230,7 @@ exports.BranchSummaryResult = BranchSummaryResult;
 /***/ 452:
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
-const resolvePath = __webpack_require__(708);
+const resolvePath = __webpack_require__(983);
 const {
   RESULT_MERGED,
   RESULT_MERGE_FAILED,
@@ -9239,7 +9239,7 @@ const {
   RESULT_SKIPPED,
   logger,
   retry
-} = __webpack_require__(176);
+} = __webpack_require__(979);
 
 const MAYBE_READY = ["clean", "has_hooks", "unknown", "unstable"];
 const NOT_READY = ["dirty", "draft"];
@@ -12178,6 +12178,379 @@ function addHook (state, kind, name, hook) {
 
 /***/ }),
 
+/***/ 552:
+/***/ (function(module) {
+
+// gutted from https://github.com/Polymer/observe-js/blob/master/src/observe.js
+function noop () {}
+function detectEval () {
+  // Don't test for eval if we're running in a Chrome App environment.
+  // We check for APIs set that only exist in a Chrome App context.
+  if (typeof chrome !== 'undefined' && chrome.app && chrome.app.runtime) {
+    return false
+  }
+
+  // Firefox OS Apps do not allow eval. This feature detection is very hacky
+  // but even if some other platform adds support for this function this code
+  // will continue to work.
+  if (typeof navigator != 'undefined' && navigator.getDeviceStorage) {
+    return false
+  }
+
+  try {
+    var f = new Function('', 'return true;')
+    return f()
+  } catch (ex) {
+    return false
+  }
+}
+
+var hasEval = detectEval()
+
+function isIndex (s) {
+  return +s === s >>> 0 && s !== ''
+}
+
+function isObject (obj) {
+  return obj === Object(obj)
+}
+
+var createObject = ('__proto__' in {}) ?
+  function (obj) {
+    return obj
+  } :
+  function (obj) {
+    var proto = obj.__proto__
+    if (!proto)
+      return obj
+    var newObject = Object.create(proto)
+    Object.getOwnPropertyNames(obj).forEach(function (name) {
+      Object.defineProperty(newObject, name,
+        Object.getOwnPropertyDescriptor(obj, name))
+    })
+    return newObject
+  }
+
+function parsePath (path) {
+  var keys = []
+  var index = -1
+  var c, newChar, key, type, transition, action, typeMap, mode = 'beforePath'
+
+  var actions = {
+    push: function () {
+      if (key === undefined)
+        return
+
+      keys.push(key)
+      key = undefined
+    },
+
+    append: function () {
+      if (key === undefined)
+        key = newChar
+      else
+        key += newChar
+    }
+  }
+
+  function maybeUnescapeQuote () {
+    if (index >= path.length)
+      return
+
+    var nextChar = path[index + 1]
+    if ((mode == 'inSingleQuote' && nextChar == "'") ||
+      (mode == 'inDoubleQuote' && nextChar == '"')) {
+      index++
+      newChar = nextChar
+      actions.append()
+      return true
+    }
+  }
+
+  while (mode) {
+    index++
+    c = path[index]
+
+    if (c == '\\' && maybeUnescapeQuote(mode))
+      continue
+
+    type = getPathCharType(c)
+    typeMap = pathStateMachine[mode]
+    transition = typeMap[type] || typeMap['else'] || 'error'
+
+    if (transition == 'error')
+      return // parse error
+
+    mode = transition[0]
+    action = actions[transition[1]] || noop
+    newChar = transition[2] === undefined ? c : transition[2]
+    action()
+
+    if (mode === 'afterPath') {
+      return keys
+    }
+  }
+
+  return // parse error
+}
+
+var identStart = '[\$_a-zA-Z]'
+var identPart = '[\$_a-zA-Z0-9]'
+var identRegExp = new RegExp('^' + identStart + '+' + identPart + '*' + '$')
+
+function isIdent (s) {
+  return identRegExp.test(s)
+}
+
+var constructorIsPrivate = {}
+
+function Path (parts, privateToken) {
+  if (privateToken !== constructorIsPrivate)
+    throw Error('Use Path.get to retrieve path objects')
+
+  for (var i = 0; i < parts.length; i++) {
+    this.push(String(parts[i]))
+  }
+
+  if (hasEval && this.length) {
+    this.getValueFrom = this.compiledGetValueFromFn()
+  }
+}
+
+var pathCache = {}
+
+function getPath (pathString) {
+  if (pathString instanceof Path)
+    return pathString
+
+  if (pathString == null || pathString.length == 0)
+    pathString = ''
+
+  if (typeof pathString != 'string') {
+    if (isIndex(pathString.length)) {
+      // Constructed with array-like (pre-parsed) keys
+      return new Path(pathString, constructorIsPrivate)
+    }
+
+    pathString = String(pathString)
+  }
+
+  var path = pathCache[pathString]
+  if (path)
+    return path
+
+  var parts = parsePath(pathString)
+  if (!parts)
+    return invalidPath
+
+  var path = new Path(parts, constructorIsPrivate)
+  pathCache[pathString] = path
+  return path
+}
+
+Path.get = getPath
+
+function formatAccessor (key) {
+  if (isIndex(key)) {
+    return '[' + key + ']'
+  } else {
+    return '["' + key.replace(/"/g, '\\"') + '"]'
+  }
+}
+
+Path.prototype = createObject({
+  __proto__: [],
+  valid: true,
+
+  toString: function () {
+    var pathString = ''
+    for (var i = 0; i < this.length; i++) {
+      var key = this[i]
+      if (isIdent(key)) {
+        pathString += i ? '.' + key : key
+      } else {
+        pathString += formatAccessor(key)
+      }
+    }
+
+    return pathString
+  },
+
+  getValueFrom: function (obj, directObserver) {
+    for (var i = 0; i < this.length; i++) {
+      if (obj == null)
+        return
+      obj = obj[this[i]]
+    }
+    return obj
+  },
+
+  iterateObjects: function (obj, observe) {
+    for (var i = 0; i < this.length; i++) {
+      if (i)
+        obj = obj[this[i - 1]]
+      if (!isObject(obj))
+        return
+      observe(obj, this[i])
+    }
+  },
+
+  compiledGetValueFromFn: function () {
+    var str = ''
+    var pathString = 'obj'
+    str += 'if (obj != null'
+    var i = 0
+    var key
+    for (; i < (this.length - 1); i++) {
+      key = this[i]
+      pathString += isIdent(key) ? '.' + key : formatAccessor(key)
+      str += ' &&\n     ' + pathString + ' != null'
+    }
+    str += ')\n'
+
+    var key = this[i]
+    pathString += isIdent(key) ? '.' + key : formatAccessor(key)
+
+    str += '  return ' + pathString + ';\nelse\n  return undefined;'
+    return new Function('obj', str)
+  },
+
+  setValueFrom: function (obj, value) {
+    if (!this.length)
+      return false
+
+    for (var i = 0; i < this.length - 1; i++) {
+      if (!isObject(obj))
+        return false
+      obj = obj[this[i]]
+    }
+
+    if (!isObject(obj))
+      return false
+
+    obj[this[i]] = value
+    return true
+  }
+})
+
+function getPathCharType (char) {
+  if (char === undefined)
+    return 'eof'
+
+  var code = char.charCodeAt(0)
+
+  switch (code) {
+    case 0x5B: // [
+    case 0x5D: // ]
+    case 0x2E: // .
+    case 0x22: // "
+    case 0x27: // '
+    case 0x30: // 0
+      return char
+
+    case 0x5F: // _
+    case 0x24: // $
+      return 'ident'
+
+    case 0x20: // Space
+    case 0x09: // Tab
+    case 0x0A: // Newline
+    case 0x0D: // Return
+    case 0xA0: // No-break space
+    case 0xFEFF: // Byte Order Mark
+    case 0x2028: // Line Separator
+    case 0x2029: // Paragraph Separator
+      return 'ws'
+  }
+
+  // a-z, A-Z
+  if ((0x61 <= code && code <= 0x7A) || (0x41 <= code && code <= 0x5A))
+    return 'ident'
+
+  // 1-9
+  if (0x31 <= code && code <= 0x39)
+    return 'number'
+
+  return 'else'
+}
+
+var pathStateMachine = {
+  'beforePath': {
+    'ws': ['beforePath'],
+    'ident': ['inIdent', 'append'],
+    '[': ['beforeElement'],
+    'eof': ['afterPath']
+  },
+
+  'inPath': {
+    'ws': ['inPath'],
+    '.': ['beforeIdent'],
+    '[': ['beforeElement'],
+    'eof': ['afterPath']
+  },
+
+  'beforeIdent': {
+    'ws': ['beforeIdent'],
+    'ident': ['inIdent', 'append']
+  },
+
+  'inIdent': {
+    'ident': ['inIdent', 'append'],
+    '0': ['inIdent', 'append'],
+    'number': ['inIdent', 'append'],
+    'ws': ['inPath', 'push'],
+    '.': ['beforeIdent', 'push'],
+    '[': ['beforeElement', 'push'],
+    'eof': ['afterPath', 'push']
+  },
+
+  'beforeElement': {
+    'ws': ['beforeElement'],
+    '0': ['afterZero', 'append'],
+    'number': ['inIndex', 'append'],
+    "'": ['inSingleQuote', 'append', ''],
+    '"': ['inDoubleQuote', 'append', '']
+  },
+
+  'afterZero': {
+    'ws': ['afterElement', 'push'],
+    ']': ['inPath', 'push']
+  },
+
+  'inIndex': {
+    '0': ['inIndex', 'append'],
+    'number': ['inIndex', 'append'],
+    'ws': ['afterElement'],
+    ']': ['inPath', 'push']
+  },
+
+  'inSingleQuote': {
+    "'": ['afterElement'],
+    'eof': ['error'],
+    'else': ['inSingleQuote', 'append']
+  },
+
+  'inDoubleQuote': {
+    '"': ['afterElement'],
+    'eof': ['error'],
+    'else': ['inDoubleQuote', 'append']
+  },
+
+  'afterElement': {
+    'ws': ['afterElement'],
+    ']': ['inPath', 'push']
+  }
+}
+
+var invalidPath = new Path('', constructorIsPrivate)
+invalidPath.valid = false
+invalidPath.getValueFrom = invalidPath.setValueFrom = function () {}
+
+module.exports = Path
+
+
+/***/ }),
+
 /***/ 559:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
@@ -12939,7 +13312,7 @@ exports.default = default_1;
 
 module.exports = {
   // Export promiseified graceful-fs:
-  ...__webpack_require__(274),
+  ...__webpack_require__(176),
   // Export extra methods:
   ...__webpack_require__(135),
   ...__webpack_require__(335),
@@ -13526,14 +13899,6 @@ class GitExecutor {
 }
 exports.GitExecutor = GitExecutor;
 //# sourceMappingURL=git-executor.js.map
-
-/***/ }),
-
-/***/ 708:
-/***/ (function(module) {
-
-module.exports = eval("require")("object-resolve-path");
-
 
 /***/ }),
 
@@ -14658,6 +15023,13 @@ Octokit.plugins = [];
 exports.Octokit = Octokit;
 //# sourceMappingURL=index.js.map
 
+
+/***/ }),
+
+/***/ 765:
+/***/ (function(module) {
+
+module.exports = require("process");
 
 /***/ }),
 
@@ -16137,7 +16509,7 @@ function plural(ms, msAbs, n, name) {
 "use strict";
 
 
-const fs = __webpack_require__(274)
+const fs = __webpack_require__(176)
 const path = __webpack_require__(622)
 const util = __webpack_require__(669)
 const atLeastNode = __webpack_require__(995)
@@ -19171,6 +19543,319 @@ function globUnescape (s) {
 
 function regExpEscape (s) {
   return s.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')
+}
+
+
+/***/ }),
+
+/***/ 979:
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+const util = __webpack_require__(669);
+const process = __webpack_require__(765);
+const fse = __webpack_require__(630);
+const tmp = __webpack_require__(282);
+
+const RESULT_SKIPPED = "skipped";
+const RESULT_NOT_READY = "not_ready";
+const RESULT_AUTHOR_FILTERED = "author_filtered";
+const RESULT_MERGE_FAILED = "merge_failed";
+const RESULT_MERGED = "merged";
+
+class ClientError extends Error {}
+
+class TimeoutError extends Error {}
+
+function log(prefix, obj) {
+  if (process.env.NODE_ENV !== "test") {
+    const now = new Date().toISOString();
+    const str = obj.map(o => (typeof o === "object" ? inspect(o) : o));
+    if (prefix) {
+      console.log.apply(console, [now, prefix, ...str]);
+    } else {
+      console.log.apply(console, [now, ...str]);
+    }
+  }
+}
+
+const logger = {
+  level: "info",
+
+  trace: (...str) => {
+    if (logger.level === "trace") {
+      log("TRACE", str);
+    }
+  },
+
+  debug: (...str) => {
+    if (logger.level === "trace" || logger.level === "debug") {
+      log("DEBUG", str);
+    }
+  },
+
+  info: (...str) => log("INFO ", str),
+
+  error: (...str) => {
+    if (str.length === 1 && str[0] instanceof Error) {
+      if (logger.level === "trace" || logger.level === "debug") {
+        log(null, [str[0].stack || str[0]]);
+      } else {
+        log("ERROR", [str[0].message || str[0]]);
+      }
+    } else {
+      log("ERROR", str);
+    }
+  }
+};
+
+function inspect(obj) {
+  return util.inspect(obj, false, null, true);
+}
+
+function createConfig(env = {}) {
+  function parseMergeLabels(str, defaultValue) {
+    const arr = (str == null ? defaultValue : str)
+      .split(",")
+      .map(s => s.trim());
+    return {
+      required: arr.filter(s => !s.startsWith("!") && s.length > 0),
+      blocking: arr
+        .filter(s => s.startsWith("!"))
+        .map(s => s.substr(1).trim())
+        .filter(s => s.length > 0)
+    };
+  }
+
+  function parseLabelMethods(str) {
+    return (str ? str.split(",") : []).map(lm => {
+      const [label, method] = lm.split("=");
+      if (!label || !method) {
+        throw new Error(
+          `Couldn't parse "${lm}" as "<label>=<method>" expression`
+        );
+      }
+      return { label, method };
+    });
+  }
+
+  function parseArray(str) {
+    return str ? str.split(",") : [];
+  }
+
+  function parseBranches(str, defaultValue) {
+    return (str == null ? defaultValue : str)
+      .split(",")
+      .map(s => s.trim())
+      .filter(s => s);
+  }
+
+  function parsePositiveInt(name, defaultValue) {
+    const val = env[name];
+    if (val == null || val === "") {
+      return defaultValue;
+    } else {
+      const number = parseInt(val, 10);
+      if (isNaN(number) || number < 0) {
+        throw new ClientError(`Not a positive integer: ${val}`);
+      } else {
+        return number;
+      }
+    }
+  }
+
+  function parsePullRequest(pullRequest) {
+    if (!pullRequest) {
+      return null;
+    }
+
+    logger.info(`Parsing PULL_REQUEST input: ${pullRequest}`);
+
+    const error = new ClientError(
+      `Invalid value provided for input PULL_REQUEST: ${pullRequest}. Must be a positive integer, optionally prefixed by a repo slug.`
+    );
+
+    if (typeof pullRequest === "string") {
+      let repoOwner;
+      let repoName;
+      let pullRequestNumber;
+
+      const destructuredPullRequest = pullRequest.split("/");
+      if (destructuredPullRequest.length === 3) {
+        [repoOwner, repoName, pullRequestNumber] = destructuredPullRequest;
+      } else if (destructuredPullRequest.length === 1) {
+        [pullRequestNumber] = destructuredPullRequest;
+      } else {
+        throw error;
+      }
+
+      pullRequestNumber = parseInt(pullRequestNumber, 10);
+      if (isNaN(pullRequestNumber) || pullRequestNumber <= 0) {
+        throw error;
+      }
+
+      return {
+        repoOwner,
+        repoName,
+        pullRequestNumber
+      };
+    }
+
+    if (typeof pullRequest === "number" && pullRequest > 0) {
+      return { pullRequestNumber: pullRequest };
+    }
+
+    throw error;
+  }
+
+  const mergeLabels = parseMergeLabels(env.MERGE_LABELS, "automerge");
+  const mergeRemoveLabels = parseArray(env.MERGE_REMOVE_LABELS);
+  const mergeMethod = env.MERGE_METHOD || "merge";
+  const mergeForks = env.MERGE_FORKS !== "false";
+  const mergeCommitMessage = env.MERGE_COMMIT_MESSAGE || "automatic";
+  const mergeCommitMessageRegex = env.MERGE_COMMIT_MESSAGE_REGEX || "";
+  const mergeFilterAuthor = env.MERGE_FILTER_AUTHOR || "";
+  const mergeRetries = parsePositiveInt("MERGE_RETRIES", 6);
+  const mergeRetrySleep = parsePositiveInt("MERGE_RETRY_SLEEP", 5000);
+  const mergeRequiredApprovals = parsePositiveInt(
+    "MERGE_REQUIRED_APPROVALS",
+    0
+  );
+  const mergeDeleteBranch = env.MERGE_DELETE_BRANCH === "true";
+  const mergeDeleteBranchFilter = parseArray(env.MERGE_DELETE_BRANCH_FILTER);
+  const mergeMethodLabels = parseLabelMethods(env.MERGE_METHOD_LABELS);
+  const mergeMethodLabelRequired = env.MERGE_METHOD_LABEL_REQUIRED === "true";
+  const mergeErrorFail = env.MERGE_ERROR_FAIL === "true";
+
+  const updateLabels = parseMergeLabels(env.UPDATE_LABELS, "automerge");
+  const updateMethod = env.UPDATE_METHOD || "merge";
+  const updateRetries = parsePositiveInt("UPDATE_RETRIES", 1);
+  const updateRetrySleep = parsePositiveInt("UPDATE_RETRY_SLEEP", 5000);
+
+  const baseBranches = parseBranches(env.BASE_BRANCHES, "");
+
+  const pullRequest = parsePullRequest(env.PULL_REQUEST);
+
+  return {
+    mergeLabels,
+    mergeRemoveLabels,
+    mergeMethod,
+    mergeMethodLabels,
+    mergeMethodLabelRequired,
+    mergeForks,
+    mergeCommitMessage,
+    mergeCommitMessageRegex,
+    mergeFilterAuthor,
+    mergeRetries,
+    mergeRetrySleep,
+    mergeRequiredApprovals,
+    mergeDeleteBranch,
+    mergeDeleteBranchFilter,
+    mergeErrorFail,
+    updateLabels,
+    updateMethod,
+    updateRetries,
+    updateRetrySleep,
+    baseBranches,
+    pullRequest
+  };
+}
+
+function tmpdir(callback) {
+  async function handle(path) {
+    try {
+      return await callback(path);
+    } finally {
+      await fse.remove(path);
+    }
+  }
+
+  return new Promise((resolve, reject) => {
+    tmp.dir((err, path) => {
+      if (err) {
+        reject(err);
+      } else {
+        handle(path).then(resolve, reject);
+      }
+    });
+  });
+}
+
+async function retry(retries, retrySleep, doInitial, doRetry, doFailed) {
+  const initialResult = await doInitial();
+  if (initialResult === "success") {
+    return true;
+  } else if (initialResult === "failure") {
+    return false;
+  } else if (initialResult !== "retry") {
+    throw new Error(`invalid return value: ${initialResult}`);
+  }
+
+  for (let run = 1; run <= retries; run++) {
+    if (retrySleep === 0) {
+      logger.info(`Retrying ... (${run}/${retries})`);
+    } else {
+      logger.info(`Retrying after ${retrySleep} ms ... (${run}/${retries})`);
+      await sleep(retrySleep);
+    }
+
+    const retryResult = await doRetry();
+    if (retryResult === "success") {
+      return true;
+    } else if (retryResult === "failure") {
+      return false;
+    } else if (retryResult !== "retry") {
+      throw new Error(`invalid return value: ${initialResult}`);
+    }
+  }
+
+  await doFailed();
+  return false;
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+module.exports = {
+  ClientError,
+  TimeoutError,
+  logger,
+  createConfig,
+  tmpdir,
+  inspect,
+  retry,
+  sleep,
+  RESULT_SKIPPED,
+  RESULT_NOT_READY,
+  RESULT_AUTHOR_FILTERED,
+  RESULT_MERGE_FAILED,
+  RESULT_MERGED
+};
+
+/***/ }),
+
+/***/ 983:
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var Path = __webpack_require__(552)
+/**
+ *
+ * @param {Object} o
+ * @param {String} path
+ * @returns {*}
+ */
+module.exports = function (o, path) {
+  if (typeof path !== 'string') {
+    throw new TypeError('path must be a string')
+  }
+  if (typeof o !== 'object') {
+    throw new TypeError('object must be passed')
+  }
+  var pathObj = Path.get(path)
+  if (!pathObj.valid) {
+    throw new Error('path is not a valid object path')
+  }
+  return pathObj.getValueFrom(o)
 }
 
 
