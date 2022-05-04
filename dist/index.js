@@ -17954,8 +17954,8 @@ async function run() {
 
     const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
 
-    const octokit = GitHub.plugin(retry);
-    const myOctokit = new octokit(getOctokitOptions(gitHubKey, {
+    const octokitWithRetry = GitHub.plugin(retry);
+    const octokit = new octokitWithRetry(getOctokitOptions(gitHubKey, {
       // Topics are currently only available using mercy-preview.
       previews: ['mercy-preview'],
     }));
@@ -17967,7 +17967,7 @@ async function run() {
     /*
      * 1. Getting list of files that must be replicated in other repos by this action
      */    
-    const filesToReplicate = await getListOfFilesToReplicate(myOctokit, commitId, owner, repo, patternsToIgnore, patternsToInclude, triggerEventName);
+    const filesToReplicate = await getListOfFilesToReplicate(octokit, commitId, owner, repo, patternsToIgnore, patternsToInclude, triggerEventName);
     //if no files need replication, we just need to stop the workflow from further execution
     if (!filesToReplicate.length) 
       return;
@@ -17978,9 +17978,9 @@ async function run() {
      */
     let reposList = [];
     if (isWorkflowDispatch && repoNameManual) {
-      reposList.push(await getRepo(myOctokit, owner, repoNameManual));
+      reposList.push(await getRepo(octokit, owner, repoNameManual));
     } else {
-      reposList = await getReposList(myOctokit, owner);
+      reposList = await getReposList(octokit, owner);
     }
 
     /*
@@ -18023,7 +18023,7 @@ async function run() {
            * 4c. Checking what branches should this action operate on. 
            *     Should it be just default one or the ones provided by the user
            */
-          const branchesToOperateOn = await getBranchesList(myOctokit, owner, repo.name, branches, defaultBranch); 
+          const branchesToOperateOn = await getBranchesList(octokit, owner, repo.name, branches, defaultBranch); 
           if (!branchesToOperateOn.length) {
             core.info('Repo has no branches that the action could operate on');
             continue;
@@ -18060,7 +18060,7 @@ async function run() {
               /*
                * 4fe. Opening a PR
                */  
-              const pr = await createPr(myOctokit, newBranchName, repo.id, commitMessage, branchName);
+              const pr = await createPr(octokit, newBranchName, repo.id, commitMessage, branchName);
                     
               core.endGroup();
           
@@ -18068,7 +18068,7 @@ async function run() {
                 core.info(`Pull Request for ${repo.name} is created (# ${pr.number}) -> ${pr.url}`);
 
 
-                let { data: pullRequest } = await myOctokit.pulls.get({
+                let { data: pullRequest } = await octokit.pulls.get({
                   owner: repo.owner,
                   repo: repo.name,
                   pull_number: pr.number,
@@ -18082,7 +18082,7 @@ async function run() {
                   MERGE_LABELS: ""
                 });
 
-                const mergeResult = await merge({ config, myOctokit }, pullRequest);
+                const mergeResult = await merge({ config, myOctokit: octokit }, pullRequest);
 
               } else {
                 core.info(`Unable to create a PR because of timeouts. Create Pull Request manually from the branch ${newBranchName} that was already created in the upstream`);
