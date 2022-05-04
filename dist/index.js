@@ -9997,8 +9997,8 @@ const PR_PROPERTY = new RegExp("{pullRequest.([^}]+)}", "g");
 
 module.exports = { merge };
 
-async function merge(context, pullRequest, approvalCount) {
-  if (skipPullRequest(context, pullRequest, approvalCount)) {
+async function merge(context, pullRequest) {
+  if (skipPullRequest(context, pullRequest)) {
     return RESULT_SKIPPED;
   }
 
@@ -18063,21 +18063,21 @@ async function run() {
               core.endGroup();
           
               if (pr) {
-                core.info(`Workflow finished with success and PR for ${repo.name} is created  (# ${pr['number']}) -> ${pr['url']}`);
+                core.info(`Pull Request for ${repo.name} is created (# ${pr['number']}) -> ${pr['url']}`);
 
                 let { data: pullRequest } = await myOctokit.pulls.get({
                   owner: repo.owner,
                   repo: repo.name,
-                  pull_number: pr.number,
+                  pull_number: pr['number'],
                   headers: { "If-None-Match": "" }
                 });
                 
-                core.info(`Attempting to automerge the PR (# ${pr['number']}) for ${repo.name}`);
+                core.info(`Attempting to auto-merge the Pull Request (# ${pr['number']}) for ${repo.name}`);
                 const mergeResult = await merge(context, pullRequest);
 
 
               } else {
-                core.info(`Unable to create a PR because of timeouts. Create PR manually from the branch ${newBranchName} that was already created in the upstream`);
+                core.info(`Unable to create a PR because of timeouts. Create Pull Request manually from the branch ${newBranchName} that was already created in the upstream`);
               }
             } else {
               core.endGroup();
