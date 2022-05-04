@@ -1992,6 +1992,7 @@ async function getRepo(octokit, owner, repo) {
     fork: data.fork,
     archived: data.archived,
     topics: data.topics,
+    owner: data.owner.login
   };
 
   core.debug(`DEBUG: Repo ${repo} full response`);
@@ -2076,6 +2077,7 @@ async function createPr(octokit, branchName, id, commitMessage, defaultBranch) {
         repositoryId: $id
       }){
         pullRequest {
+          id
           url
         }
       }
@@ -2098,14 +2100,12 @@ async function createPr(octokit, branchName, id, commitMessage, defaultBranch) {
       core.info('Waiting 5sec before PR creation');
       await sleep(5000);
       core.info(`PR creation attempt ${count}`);
-      const { createPullRequest: { pullRequest: { url: pullRequestUrl } } } = await octokit.graphql(createPrMutation, newPrVariables);
+      const { createPullRequest: { pullRequest } } = await octokit.graphql(createPrMutation, newPrVariables);
       retries = 0;
-      return pullRequestUrl;
+      return pullRequest;
     } catch (error) {
-      //if error is different than rate limit/timeout related we should throw error as it is very probable that 
-      //next PR will also fail anyway, we should let user know early in the process by failing the action
       if (error.message !== 'was submitted too quickly') {
-        throw new Error(`Unable to create a PR: ${  error}`);
+        throw new Error(`Unable to create a PR: ${ error}`);
       }
     }
   }
@@ -2130,7 +2130,7 @@ module.exports = require("child_process");
 "use strict";
 
 const u = __webpack_require__(46).fromPromise
-const fs = __webpack_require__(176)
+const fs = __webpack_require__(274)
 
 function pathExists (path) {
   return fs.access(path).then(() => true).catch(() => false)
@@ -4089,137 +4089,9 @@ exports.cloneMirrorTask = cloneMirrorTask;
 /***/ }),
 
 /***/ 176:
-/***/ (function(__unusedmodule, exports, __webpack_require__) {
+/***/ (function(module) {
 
-"use strict";
-
-// This is adapted from https://github.com/normalize/mz
-// Copyright (c) 2014-2016 Jonathan Ong me@jongleberry.com and Contributors
-const u = __webpack_require__(46).fromCallback
-const fs = __webpack_require__(758)
-
-const api = [
-  'access',
-  'appendFile',
-  'chmod',
-  'chown',
-  'close',
-  'copyFile',
-  'fchmod',
-  'fchown',
-  'fdatasync',
-  'fstat',
-  'fsync',
-  'ftruncate',
-  'futimes',
-  'lchmod',
-  'lchown',
-  'link',
-  'lstat',
-  'mkdir',
-  'mkdtemp',
-  'open',
-  'opendir',
-  'readdir',
-  'readFile',
-  'readlink',
-  'realpath',
-  'rename',
-  'rmdir',
-  'stat',
-  'symlink',
-  'truncate',
-  'unlink',
-  'utimes',
-  'writeFile'
-].filter(key => {
-  // Some commands are not available on some systems. Ex:
-  // fs.opendir was added in Node.js v12.12.0
-  // fs.lchown is not available on at least some Linux
-  return typeof fs[key] === 'function'
-})
-
-// Export all keys:
-Object.keys(fs).forEach(key => {
-  if (key === 'promises') {
-    // fs.promises is a getter property that triggers ExperimentalWarning
-    // Don't re-export it here, the getter is defined in "lib/index.js"
-    return
-  }
-  exports[key] = fs[key]
-})
-
-// Universalify async methods:
-api.forEach(method => {
-  exports[method] = u(fs[method])
-})
-
-// We differ from mz/fs in that we still ship the old, broken, fs.exists()
-// since we are a drop-in replacement for the native module
-exports.exists = function (filename, callback) {
-  if (typeof callback === 'function') {
-    return fs.exists(filename, callback)
-  }
-  return new Promise(resolve => {
-    return fs.exists(filename, resolve)
-  })
-}
-
-// fs.read(), fs.write(), & fs.writev() need special treatment due to multiple callback args
-
-exports.read = function (fd, buffer, offset, length, position, callback) {
-  if (typeof callback === 'function') {
-    return fs.read(fd, buffer, offset, length, position, callback)
-  }
-  return new Promise((resolve, reject) => {
-    fs.read(fd, buffer, offset, length, position, (err, bytesRead, buffer) => {
-      if (err) return reject(err)
-      resolve({ bytesRead, buffer })
-    })
-  })
-}
-
-// Function signature can be
-// fs.write(fd, buffer[, offset[, length[, position]]], callback)
-// OR
-// fs.write(fd, string[, position[, encoding]], callback)
-// We need to handle both cases, so we use ...args
-exports.write = function (fd, buffer, ...args) {
-  if (typeof args[args.length - 1] === 'function') {
-    return fs.write(fd, buffer, ...args)
-  }
-
-  return new Promise((resolve, reject) => {
-    fs.write(fd, buffer, ...args, (err, bytesWritten, buffer) => {
-      if (err) return reject(err)
-      resolve({ bytesWritten, buffer })
-    })
-  })
-}
-
-// fs.writev only available in Node v12.9.0+
-if (typeof fs.writev === 'function') {
-  // Function signature is
-  // s.writev(fd, buffers[, position], callback)
-  // We need to handle the optional arg, so we use ...args
-  exports.writev = function (fd, buffers, ...args) {
-    if (typeof args[args.length - 1] === 'function') {
-      return fs.writev(fd, buffers, ...args)
-    }
-
-    return new Promise((resolve, reject) => {
-      fs.writev(fd, buffers, ...args, (err, bytesWritten, buffers) => {
-        if (err) return reject(err)
-        resolve({ bytesWritten, buffers })
-      })
-    })
-  }
-}
-
-// fs.realpath.native only available in Node v9.2+
-if (typeof fs.realpath.native === 'function') {
-  exports.realpath.native = u(fs.realpath.native)
-}
+module.exports = eval("require")("./common");
 
 
 /***/ }),
@@ -6849,7 +6721,7 @@ exports.parseBranchSummary = parseBranchSummary;
 // The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-const fs = __webpack_require__(176)
+const fs = __webpack_require__(274)
 const path = __webpack_require__(622)
 const atLeastNode = __webpack_require__(995)
 
@@ -6983,6 +6855,142 @@ module.exports.makeDirSync = (input, options) => {
   }
 
   return make(path.resolve(input))
+}
+
+
+/***/ }),
+
+/***/ 274:
+/***/ (function(__unusedmodule, exports, __webpack_require__) {
+
+"use strict";
+
+// This is adapted from https://github.com/normalize/mz
+// Copyright (c) 2014-2016 Jonathan Ong me@jongleberry.com and Contributors
+const u = __webpack_require__(46).fromCallback
+const fs = __webpack_require__(758)
+
+const api = [
+  'access',
+  'appendFile',
+  'chmod',
+  'chown',
+  'close',
+  'copyFile',
+  'fchmod',
+  'fchown',
+  'fdatasync',
+  'fstat',
+  'fsync',
+  'ftruncate',
+  'futimes',
+  'lchmod',
+  'lchown',
+  'link',
+  'lstat',
+  'mkdir',
+  'mkdtemp',
+  'open',
+  'opendir',
+  'readdir',
+  'readFile',
+  'readlink',
+  'realpath',
+  'rename',
+  'rmdir',
+  'stat',
+  'symlink',
+  'truncate',
+  'unlink',
+  'utimes',
+  'writeFile'
+].filter(key => {
+  // Some commands are not available on some systems. Ex:
+  // fs.opendir was added in Node.js v12.12.0
+  // fs.lchown is not available on at least some Linux
+  return typeof fs[key] === 'function'
+})
+
+// Export all keys:
+Object.keys(fs).forEach(key => {
+  if (key === 'promises') {
+    // fs.promises is a getter property that triggers ExperimentalWarning
+    // Don't re-export it here, the getter is defined in "lib/index.js"
+    return
+  }
+  exports[key] = fs[key]
+})
+
+// Universalify async methods:
+api.forEach(method => {
+  exports[method] = u(fs[method])
+})
+
+// We differ from mz/fs in that we still ship the old, broken, fs.exists()
+// since we are a drop-in replacement for the native module
+exports.exists = function (filename, callback) {
+  if (typeof callback === 'function') {
+    return fs.exists(filename, callback)
+  }
+  return new Promise(resolve => {
+    return fs.exists(filename, resolve)
+  })
+}
+
+// fs.read(), fs.write(), & fs.writev() need special treatment due to multiple callback args
+
+exports.read = function (fd, buffer, offset, length, position, callback) {
+  if (typeof callback === 'function') {
+    return fs.read(fd, buffer, offset, length, position, callback)
+  }
+  return new Promise((resolve, reject) => {
+    fs.read(fd, buffer, offset, length, position, (err, bytesRead, buffer) => {
+      if (err) return reject(err)
+      resolve({ bytesRead, buffer })
+    })
+  })
+}
+
+// Function signature can be
+// fs.write(fd, buffer[, offset[, length[, position]]], callback)
+// OR
+// fs.write(fd, string[, position[, encoding]], callback)
+// We need to handle both cases, so we use ...args
+exports.write = function (fd, buffer, ...args) {
+  if (typeof args[args.length - 1] === 'function') {
+    return fs.write(fd, buffer, ...args)
+  }
+
+  return new Promise((resolve, reject) => {
+    fs.write(fd, buffer, ...args, (err, bytesWritten, buffer) => {
+      if (err) return reject(err)
+      resolve({ bytesWritten, buffer })
+    })
+  })
+}
+
+// fs.writev only available in Node v12.9.0+
+if (typeof fs.writev === 'function') {
+  // Function signature is
+  // s.writev(fd, buffers[, position], callback)
+  // We need to handle the optional arg, so we use ...args
+  exports.writev = function (fd, buffers, ...args) {
+    if (typeof args[args.length - 1] === 'function') {
+      return fs.writev(fd, buffers, ...args)
+    }
+
+    return new Promise((resolve, reject) => {
+      fs.writev(fd, buffers, ...args, (err, bytesWritten, buffers) => {
+        if (err) return reject(err)
+        resolve({ bytesWritten, buffers })
+      })
+    })
+  }
+}
+
+// fs.realpath.native only available in Node v9.2+
+if (typeof fs.realpath.native === 'function') {
+  exports.realpath.native = u(fs.realpath.native)
 }
 
 
@@ -9216,6 +9224,435 @@ class BranchSummaryResult {
 }
 exports.BranchSummaryResult = BranchSummaryResult;
 //# sourceMappingURL=BranchSummary.js.map
+
+/***/ }),
+
+/***/ 452:
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+const resolvePath = __webpack_require__(708);
+const {
+  RESULT_MERGED,
+  RESULT_MERGE_FAILED,
+  RESULT_AUTHOR_FILTERED,
+  RESULT_NOT_READY,
+  RESULT_SKIPPED,
+  logger,
+  retry
+} = __webpack_require__(176);
+
+const MAYBE_READY = ["clean", "has_hooks", "unknown", "unstable"];
+const NOT_READY = ["dirty", "draft"];
+
+const PR_PROPERTY = new RegExp("{pullRequest.([^}]+)}", "g");
+
+
+module.exports = { merge };
+
+async function merge(context, pullRequest, approvalCount) {
+  if (skipPullRequest(context, pullRequest, approvalCount)) {
+    return RESULT_SKIPPED;
+  }
+
+  logger.info(`Merging PR #${pullRequest.number} ${pullRequest.title}`);
+
+  const {
+    head: { sha }
+  } = pullRequest;
+
+  const {
+    octokit,
+    config: {
+      mergeMethod: defaultMergeMethod,
+      mergeMethodLabels,
+      mergeCommitMessage,
+      mergeCommitMessageRegex,
+      mergeFilterAuthor,
+      mergeRemoveLabels,
+      mergeRetries,
+      mergeRetrySleep,
+      mergeErrorFail
+    }
+  } = context;
+
+  const ready = await waitUntilReady(pullRequest, context);
+  if (!ready) {
+    return RESULT_NOT_READY;
+  }
+
+  if (mergeCommitMessageRegex) {
+    // If we find the regex, use the first capturing subgroup as new body (discarding whitespace).
+    const m = new RegExp(mergeCommitMessageRegex, "sm").exec(pullRequest.body);
+    if (m) {
+      if (m[1] === undefined) {
+        throw new Error(
+          `MERGE_COMMIT_MESSAGE_REGEX must contain a capturing subgroup: '${mergeCommitMessageRegex}'`
+        );
+      }
+      pullRequest.body = m[1].trim();
+    }
+  }
+
+  if (mergeFilterAuthor && pullRequest.user.login !== mergeFilterAuthor) {
+    logger.info(
+      `PR author '${pullRequest.user.login}' does not match filter:`,
+      mergeFilterAuthor
+    );
+    return RESULT_AUTHOR_FILTERED;
+  }
+
+  const commitMessage = getCommitMessage(mergeCommitMessage, pullRequest);
+  const mergeMethod = getMergeMethod(
+    defaultMergeMethod,
+    mergeMethodLabels,
+    pullRequest
+  );
+  const merged = await tryMerge(
+    octokit,
+    pullRequest,
+    sha,
+    mergeMethod,
+    mergeRetries,
+    mergeRetrySleep,
+    mergeErrorFail,
+    commitMessage
+  );
+  if (!merged) {
+    return RESULT_MERGE_FAILED;
+  }
+
+  logger.info("PR successfully merged!");
+
+  try {
+    await removeLabels(octokit, pullRequest, mergeRemoveLabels);
+  } catch (e) {
+    logger.info("Failed to remove labels:", e.message);
+  }
+
+  if (context.config.mergeDeleteBranch) {
+    try {
+      await deleteBranch(
+        octokit,
+        pullRequest,
+        context.config.mergeDeleteBranchFilter
+      );
+    } catch (e) {
+      logger.info("Failed to delete branch:", e.message);
+    }
+  }
+
+  return RESULT_MERGED;
+}
+
+async function removeLabels(octokit, pullRequest, mergeRemoveLabels) {
+  const labels = pullRequest.labels.filter(label =>
+    mergeRemoveLabels.includes(label.name)
+  );
+
+  if (labels.length < 1) {
+    logger.debug("No labels to remove.");
+    return;
+  }
+
+  const labelNames = labels.map(label => label.name);
+
+  logger.debug("Removing labels:", labelNames);
+
+  for (const name of labelNames) {
+    await octokit.issues.removeLabel({
+      owner: pullRequest.base.repo.owner.login,
+      repo: pullRequest.base.repo.name,
+      issue_number: pullRequest.number,
+      name
+    });
+  }
+
+  logger.info("Removed labels:", labelNames);
+}
+
+async function deleteBranch(octokit, pullRequest, mergeDeleteBranchFilter) {
+  if (pullRequest.head.repo.full_name !== pullRequest.base.repo.full_name) {
+    logger.info("Branch is from external repository, skipping delete");
+    return;
+  }
+
+  const branchQuery = {
+    owner: pullRequest.head.repo.owner.login,
+    repo: pullRequest.head.repo.name,
+    branch: pullRequest.head.ref
+  };
+
+  const { data: branch } = await octokit.repos.getBranch(branchQuery);
+
+  logger.trace("Branch:", branch);
+
+  if (branch.protected) {
+    const { data: protectionRules } = await octokit.repos.getBranchProtection(
+      branchQuery
+    );
+    if (
+      protectionRules.allow_deletions &&
+      !protectionRules.allow_deletions.enabled
+    ) {
+      logger.info("Branch is protected and cannot be deleted:", branch.name);
+      return;
+    }
+  } else if (mergeDeleteBranchFilter.includes(branch.name)) {
+    logger.info(
+      "Branch is in filter list and will not be deleted:",
+      branch.name
+    );
+  } else {
+    logger.debug("Deleting branch", branch.name, "...");
+    await octokit.git.deleteRef({
+      owner: pullRequest.head.repo.owner.login,
+      repo: pullRequest.head.repo.name,
+      ref: `heads/${branch.name}`
+    });
+    logger.info("Merged branch has been deleted:", branch.name);
+  }
+}
+
+function skipPullRequest(context, pullRequest) {
+  const {
+    config: {
+      mergeForks,
+      mergeLabels,
+      mergeRequiredApprovals,
+      mergeMethodLabelRequired,
+      mergeMethodLabels,
+      baseBranches
+    }
+  } = context;
+
+  let skip = false;
+
+  if (pullRequest.state !== "open") {
+    logger.info("Skipping PR merge, state is not open:", pullRequest.state);
+    skip = true;
+  }
+
+  if (pullRequest.merged === true) {
+    logger.info("Skipping PR merge, already merged!");
+    skip = true;
+  }
+
+  if (pullRequest.head.repo.full_name !== pullRequest.base.repo.full_name) {
+    if (!mergeForks) {
+      logger.info("PR is a fork and MERGE_FORKS is false, skipping merge");
+      skip = true;
+    }
+  }
+
+  const labels = pullRequest.labels.map(label => label.name);
+
+  for (const label of pullRequest.labels) {
+    if (mergeLabels.blocking.includes(label.name)) {
+      logger.info("Skipping PR merge, blocking label present:", label.name);
+      skip = true;
+    }
+  }
+
+  for (const required of mergeLabels.required) {
+    if (!labels.includes(required)) {
+      logger.info("Skipping PR merge, required label missing:", required);
+      skip = true;
+    }
+  }
+
+  const numberMethodLabelsFound = mergeMethodLabels
+    .map(lm => labels.includes(lm.label))
+    .filter(x => x).length;
+  if (mergeMethodLabelRequired && numberMethodLabelsFound === 0) {
+    logger.info("Skipping PR merge, required merge method label missing");
+    skip = true;
+  }
+
+  if (
+    baseBranches &&
+    baseBranches.length &&
+    !baseBranches.some(branch => branch === pullRequest.base.ref)
+  ) {
+    logger.info(
+      "Skipping PR merge, base branch is not in the provided list:",
+      baseBranches
+    );
+    skip = true;
+  }
+
+  return skip;
+}
+
+function waitUntilReady(pullRequest, context) {
+  const {
+    octokit,
+    config: { mergeRetries, mergeRetrySleep, mergeErrorFail }
+  } = context;
+
+  return retry(
+    mergeRetries,
+    mergeRetrySleep,
+    () => checkReady(pullRequest, context),
+    async () => {
+      const pr = await getPullRequest(octokit, pullRequest);
+      return checkReady(pr, context);
+    },
+    () => failOrInfo(mergeRetries, mergeErrorFail)
+  );
+}
+
+function checkReady(pullRequest, context) {
+  if (skipPullRequest(context, pullRequest)) {
+    return "failure";
+  }
+  return mergeable(pullRequest);
+}
+
+function mergeable(pullRequest) {
+  const { mergeable_state } = pullRequest;
+  if (mergeable_state == null || MAYBE_READY.includes(mergeable_state)) {
+    logger.info("PR is probably ready: mergeable_state:", mergeable_state);
+    return "success";
+  } else if (NOT_READY.includes(mergeable_state)) {
+    logger.info("PR not ready: mergeable_state:", mergeable_state);
+    return "failure";
+  } else {
+    logger.info("Current PR status: mergeable_state:", mergeable_state);
+    return "retry";
+  }
+}
+
+async function getPullRequest(octokit, pullRequest) {
+  logger.debug("Getting latest PR data...");
+  const { data: pr } = await octokit.pulls.get({
+    owner: pullRequest.base.repo.owner.login,
+    repo: pullRequest.base.repo.name,
+    pull_number: pullRequest.number,
+    headers: { "If-None-Match": "" }
+  });
+
+  logger.trace("PR:", pr);
+
+  return pr;
+}
+
+function tryMerge(
+  octokit,
+  pullRequest,
+  head,
+  mergeMethod,
+  mergeRetries,
+  mergeRetrySleep,
+  mergeErrorFail,
+  commitMessage
+) {
+  return retry(
+    mergeRetries,
+    mergeRetrySleep,
+    () =>
+      mergePullRequest(octokit, pullRequest, head, mergeMethod, commitMessage),
+    async () => {
+      const pr = await getPullRequest(octokit, pullRequest);
+      if (pr.merged === true) {
+        return "success";
+      }
+      return mergePullRequest(
+        octokit,
+        pullRequest,
+        head,
+        mergeMethod,
+        commitMessage
+      );
+    },
+    () => failOrInfo(mergeRetries, mergeErrorFail)
+  );
+}
+
+function failOrInfo(mergeRetries, mergeErrorFail) {
+  const message = `PR not ready to be merged after ${mergeRetries} tries`;
+  if (mergeErrorFail) {
+    logger.error(message);
+    process.exit(1);
+  } else {
+    logger.info(message);
+  }
+}
+
+function getMergeMethod(defaultMergeMethod, mergeMethodLabels, pullRequest) {
+  const foundMergeMethodLabels = pullRequest.labels.flatMap(l =>
+    mergeMethodLabels.filter(ml => ml.label === l.name)
+  );
+  if (foundMergeMethodLabels.length > 0) {
+    const first = foundMergeMethodLabels[0];
+    if (foundMergeMethodLabels.length > 1) {
+      throw new Error(
+        `Discovered multiple merge method labels, only one is permitted!`
+      );
+    } else {
+      logger.info(
+        `Discovered ${first.label}, will merge with method ${first.method}`
+      );
+    }
+    return first.method;
+  }
+  return defaultMergeMethod;
+}
+
+function getCommitMessage(mergeCommitMessage, pullRequest) {
+  if (mergeCommitMessage === "automatic") {
+    return undefined;
+  } else if (mergeCommitMessage === "pull-request-title") {
+    return pullRequest.title;
+  } else if (mergeCommitMessage === "pull-request-description") {
+    return pullRequest.body;
+  } else if (mergeCommitMessage === "pull-request-title-and-description") {
+    return (
+      pullRequest.title + (pullRequest.body ? "\n\n" + pullRequest.body : "")
+    );
+  } else {
+    return mergeCommitMessage.replace(PR_PROPERTY, (_, prProp) =>
+      resolvePath(pullRequest, prProp)
+    );
+  }
+}
+
+async function mergePullRequest(
+  octokit,
+  pullRequest,
+  head,
+  mergeMethod,
+  commitMessage
+) {
+  try {
+    await octokit.pulls.merge({
+      owner: pullRequest.base.repo.owner.login,
+      repo: pullRequest.base.repo.name,
+      pull_number: pullRequest.number,
+      commit_title: commitMessage,
+      commit_message: "",
+      sha: head,
+      merge_method: mergeMethod
+    });
+    return "success";
+  } catch (e) {
+    return checkMergeError(e);
+  }
+}
+
+function checkMergeError(e) {
+  const m = e ? e.message || "" : "";
+  if (
+    m.includes("review is required by reviewers with write access") ||
+    m.includes("reviews are required by reviewers with write access") ||
+    m.includes("API rate limit exceeded")
+  ) {
+    logger.info("Cannot merge PR:", m);
+    return "failure";
+  } else {
+    logger.info("Failed to merge PR:", m);
+    return "retry";
+  }
+}
 
 /***/ }),
 
@@ -12502,7 +12939,7 @@ exports.default = default_1;
 
 module.exports = {
   // Export promiseified graceful-fs:
-  ...__webpack_require__(176),
+  ...__webpack_require__(274),
   // Export extra methods:
   ...__webpack_require__(135),
   ...__webpack_require__(335),
@@ -13089,6 +13526,14 @@ class GitExecutor {
 }
 exports.GitExecutor = GitExecutor;
 //# sourceMappingURL=git-executor.js.map
+
+/***/ }),
+
+/***/ 708:
+/***/ (function(module) {
+
+module.exports = eval("require")("object-resolve-path");
+
 
 /***/ }),
 
@@ -14640,6 +15085,8 @@ const { mkdir } = __webpack_require__(747).promises;
 const { retry } = __webpack_require__(298);
 const { GitHub, getOctokitOptions } = __webpack_require__(30);
 
+
+const { merge } = __webpack_require__(452);
 const { createBranch, clone, push, areFilesChanged, getBranchesLocal, checkoutBranch } = __webpack_require__(374);
 const { getReposList, createPr, getRepo } = __webpack_require__(119);
 const { getListOfFilesToReplicate, copyChangedFiles, getListOfReposToIgnore, getBranchName, isInitialized, getBranchesList } = __webpack_require__(918);
@@ -14781,12 +15228,24 @@ async function run() {
               /*
                * 4fe. Opening a PR
                */  
-              const pullRequestUrl = await createPr(myOctokit, newBranchName, repo.id, commitMessage, branchName);
+              const pr = await createPr(myOctokit, newBranchName, repo.id, commitMessage, branchName);
                     
               core.endGroup();
           
-              if (pullRequestUrl) {
-                core.info(`Workflow finished with success and PR for ${repo.name} is created -> ${pullRequestUrl}`);
+              if (pr) {
+                core.info(`Workflow finished with success and PR for ${repo.name} is created -> ${pr['url']}`);
+
+                let { data: pullRequest } = await myOctokit.pulls.get({
+                  owner: repo.owner,
+                  repo: repo.name,
+                  pull_number: pr.id,
+                  headers: { "If-None-Match": "" }
+                });
+                
+
+                const mergeResult = await merge(context, pullRequest);
+
+
               } else {
                 core.info(`Unable to create a PR because of timeouts. Create PR manually from the branch ${newBranchName} that was already created in the upstream`);
               }
@@ -15678,7 +16137,7 @@ function plural(ms, msAbs, n, name) {
 "use strict";
 
 
-const fs = __webpack_require__(176)
+const fs = __webpack_require__(274)
 const path = __webpack_require__(622)
 const util = __webpack_require__(669)
 const atLeastNode = __webpack_require__(995)
