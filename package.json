@@ -1,7 +1,7 @@
 {
-  "name": "global-workflows",
+  "name": "global-workflows-distribution",
   "version": "0.5.0",
-  "description": "This action introduces support for global workflows. Global workflows are the one you update in just one repo and they are automatically updated in other repositories.",
+  "description": "This action introduces support for workflows distribution across multiple repositories within organization",
   "main": "lib/index.js",
   "scripts": {
     "start": "rimraf ./clones && node lib/index.js",
