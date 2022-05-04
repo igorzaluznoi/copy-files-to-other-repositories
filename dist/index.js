@@ -9979,6 +9979,7 @@ exports.BranchSummaryResult = BranchSummaryResult;
 /* 452 */
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
+const core = __webpack_require__(186);
 const resolvePath = __webpack_require__(983);
 const {
   RESULT_MERGED,
@@ -9986,7 +9987,6 @@ const {
   RESULT_AUTHOR_FILTERED,
   RESULT_NOT_READY,
   RESULT_SKIPPED,
-  logger,
   retry
 } = __webpack_require__(979);
 
@@ -10003,7 +10003,7 @@ async function merge(context, pullRequest) {
     return RESULT_SKIPPED;
   }
 
-  logger.info(`Merging PR #${pullRequest.number} ${pullRequest.title}`);
+  core.info(`Merging PR #${pullRequest.number} ${pullRequest.title}`);
 
   const {
     head: { sha }
@@ -10043,7 +10043,7 @@ async function merge(context, pullRequest) {
   }
 
   if (mergeFilterAuthor && pullRequest.user.login !== mergeFilterAuthor) {
-    logger.info(
+    core.info(
       `PR author '${pullRequest.user.login}' does not match filter:`,
       mergeFilterAuthor
     );
@@ -10070,12 +10070,12 @@ async function merge(context, pullRequest) {
     return RESULT_MERGE_FAILED;
   }
 
-  logger.info("PR successfully merged!");
+  core.info("PR successfully merged!");
 
   try {
     await removeLabels(octokit, pullRequest, mergeRemoveLabels);
   } catch (e) {
-    logger.info("Failed to remove labels:", e.message);
+    core.info("Failed to remove labels:", e.message);
   }
 
   if (context.config.mergeDeleteBranch) {
@@ -10086,7 +10086,7 @@ async function merge(context, pullRequest) {
         context.config.mergeDeleteBranchFilter
       );
     } catch (e) {
-      logger.info("Failed to delete branch:", e.message);
+      core.info("Failed to delete branch:", e.message);
     }
   }
 
@@ -10099,13 +10099,13 @@ async function removeLabels(octokit, pullRequest, mergeRemoveLabels) {
   );
 
   if (labels.length < 1) {
-    logger.debug("No labels to remove.");
+    core.debug("No labels to remove.");
     return;
   }
 
   const labelNames = labels.map(label => label.name);
 
-  logger.debug("Removing labels:", labelNames);
+  core.debug("Removing labels:", labelNames);
 
   for (const name of labelNames) {
     await octokit.issues.removeLabel({
@@ -10116,12 +10116,12 @@ async function removeLabels(octokit, pullRequest, mergeRemoveLabels) {
     });
   }
 
-  logger.info("Removed labels:", labelNames);
+  core.info("Removed labels:", labelNames);
 }
 
 async function deleteBranch(octokit, pullRequest, mergeDeleteBranchFilter) {
   if (pullRequest.head.repo.full_name !== pullRequest.base.repo.full_name) {
-    logger.info("Branch is from external repository, skipping delete");
+    core.info("Branch is from external repository, skipping delete");
     return;
   }
 
@@ -10133,8 +10133,6 @@ async function deleteBranch(octokit, pullRequest, mergeDeleteBranchFilter) {
 
   const { data: branch } = await octokit.repos.getBranch(branchQuery);
 
-  logger.trace("Branch:", branch);
-
   if (branch.protected) {
     const { data: protectionRules } = await octokit.repos.getBranchProtection(
       branchQuery
@@ -10143,22 +10141,22 @@ async function deleteBranch(octokit, pullRequest, mergeDeleteBranchFilter) {
       protectionRules.allow_deletions &&
       !protectionRules.allow_deletions.enabled
     ) {
-      logger.info("Branch is protected and cannot be deleted:", branch.name);
+      core.info("Branch is protected and cannot be deleted:", branch.name);
       return;
     }
   } else if (mergeDeleteBranchFilter.includes(branch.name)) {
-    logger.info(
+    core.info(
       "Branch is in filter list and will not be deleted:",
       branch.name
     );
   } else {
-    logger.debug("Deleting branch", branch.name, "...");
+    core.debug("Deleting branch", branch.name, "...");
     await octokit.git.deleteRef({
       owner: pullRequest.head.repo.owner.login,
       repo: pullRequest.head.repo.name,
       ref: `heads/${branch.name}`
     });
-    logger.info("Merged branch has been deleted:", branch.name);
+    core.info("Merged branch has been deleted:", branch.name);
   }
 }
 
@@ -10177,18 +10175,18 @@ function skipPullRequest(context, pullRequest) {
   let skip = false;
 
   if (pullRequest.state !== "open") {
-    logger.info("Skipping PR merge, state is not open:", pullRequest.state);
+    core.info("Skipping PR merge, state is not open:", pullRequest.state);
     skip = true;
   }
 
   if (pullRequest.merged === true) {
-    logger.info("Skipping PR merge, already merged!");
+    core.info("Skipping PR merge, already merged!");
     skip = true;
   }
 
   if (pullRequest.head.repo.full_name !== pullRequest.base.repo.full_name) {
     if (!mergeForks) {
-      logger.info("PR is a fork and MERGE_FORKS is false, skipping merge");
+      core.info("PR is a fork and MERGE_FORKS is false, skipping merge");
       skip = true;
     }
   }
@@ -10197,14 +10195,14 @@ function skipPullRequest(context, pullRequest) {
 
   for (const label of pullRequest.labels) {
     if (mergeLabels.blocking.includes(label.name)) {
-      logger.info("Skipping PR merge, blocking label present:", label.name);
+      core.info("Skipping PR merge, blocking label present:", label.name);
       skip = true;
     }
   }
 
   for (const required of mergeLabels.required) {
     if (!labels.includes(required)) {
-      logger.info("Skipping PR merge, required label missing:", required);
+      core.info("Skipping PR merge, required label missing:", required);
       skip = true;
     }
   }
@@ -10213,7 +10211,7 @@ function skipPullRequest(context, pullRequest) {
     .map(lm => labels.includes(lm.label))
     .filter(x => x).length;
   if (mergeMethodLabelRequired && numberMethodLabelsFound === 0) {
-    logger.info("Skipping PR merge, required merge method label missing");
+    core.info("Skipping PR merge, required merge method label missing");
     skip = true;
   }
 
@@ -10222,7 +10220,7 @@ function skipPullRequest(context, pullRequest) {
     baseBranches.length &&
     !baseBranches.some(branch => branch === pullRequest.base.ref)
   ) {
-    logger.info(
+    core.info(
       "Skipping PR merge, base branch is not in the provided list:",
       baseBranches
     );
@@ -10260,27 +10258,25 @@ function checkReady(pullRequest, context) {
 function mergeable(pullRequest) {
   const { mergeable_state } = pullRequest;
   if (mergeable_state == null || MAYBE_READY.includes(mergeable_state)) {
-    logger.info("PR is probably ready: mergeable_state:", mergeable_state);
+    core.info("PR is probably ready: mergeable_state:", mergeable_state);
     return "success";
   } else if (NOT_READY.includes(mergeable_state)) {
-    logger.info("PR not ready: mergeable_state:", mergeable_state);
+    core.info("PR not ready: mergeable_state:", mergeable_state);
     return "failure";
   } else {
-    logger.info("Current PR status: mergeable_state:", mergeable_state);
+    core.info("Current PR status: mergeable_state:", mergeable_state);
     return "retry";
   }
 }
 
 async function getPullRequest(octokit, pullRequest) {
-  logger.debug("Getting latest PR data...");
+  core.debug("Getting latest PR data...");
   const { data: pr } = await octokit.pulls.get({
     owner: pullRequest.base.repo.owner.login,
     repo: pullRequest.base.repo.name,
     pull_number: pullRequest.number,
     headers: { "If-None-Match": "" }
   });
-
-  logger.trace("PR:", pr);
 
   return pr;
 }
@@ -10320,10 +10316,10 @@ function tryMerge(
 function failOrInfo(mergeRetries, mergeErrorFail) {
   const message = `PR not ready to be merged after ${mergeRetries} tries`;
   if (mergeErrorFail) {
-    logger.error(message);
+    core.error(message);
     process.exit(1);
   } else {
-    logger.info(message);
+    core.info(message);
   }
 }
 
@@ -10338,7 +10334,7 @@ function getMergeMethod(defaultMergeMethod, mergeMethodLabels, pullRequest) {
         `Discovered multiple merge method labels, only one is permitted!`
       );
     } else {
-      logger.info(
+      core.info(
         `Discovered ${first.label}, will merge with method ${first.method}`
       );
     }
@@ -10395,10 +10391,10 @@ function checkMergeError(e) {
     m.includes("reviews are required by reviewers with write access") ||
     m.includes("API rate limit exceeded")
   ) {
-    logger.info("Cannot merge PR:", m);
+    core.info("Cannot merge PR:", m);
     return "failure";
   } else {
-    logger.info("Failed to merge PR:", m);
+    core.info("Failed to merge PR:", m);
     return "retry";
   }
 }
@@ -17446,12 +17442,7 @@ exports.Octokit = Octokit;
 /***/ }),
 /* 763 */,
 /* 764 */,
-/* 765 */
-/***/ (function(module) {
-
-module.exports = require("process");
-
-/***/ }),
+/* 765 */,
 /* 766 */,
 /* 767 */,
 /* 768 */,
@@ -23338,7 +23329,6 @@ function regExpEscape (s) {
 /***/ (function(module, __unusedexports, __webpack_require__) {
 
 const util = __webpack_require__(669);
-const process = __webpack_require__(765);
 const fse = __webpack_require__(630);
 const tmp = __webpack_require__(517);
 
@@ -23349,50 +23339,8 @@ const RESULT_MERGE_FAILED = "merge_failed";
 const RESULT_MERGED = "merged";
 
 class ClientError extends Error {}
-
 class TimeoutError extends Error {}
 
-function log(prefix, obj) {
-  if (process.env.NODE_ENV !== "test") {
-    const now = new Date().toISOString();
-    const str = obj.map(o => (typeof o === "object" ? inspect(o) : o));
-    if (prefix) {
-      console.log.apply(console, [now, prefix, ...str]);
-    } else {
-      console.log.apply(console, [now, ...str]);
-    }
-  }
-}
-
-const logger = {
-  level: "info",
-
-  trace: (...str) => {
-    if (logger.level === "trace") {
-      log("TRACE", str);
-    }
-  },
-
-  debug: (...str) => {
-    if (logger.level === "trace" || logger.level === "debug") {
-      log("DEBUG", str);
-    }
-  },
-
-  info: (...str) => log("INFO ", str),
-
-  error: (...str) => {
-    if (str.length === 1 && str[0] instanceof Error) {
-      if (logger.level === "trace" || logger.level === "debug") {
-        log(null, [str[0].stack || str[0]]);
-      } else {
-        log("ERROR", [str[0].message || str[0]]);
-      }
-    } else {
-      log("ERROR", str);
-    }
-  }
-};
 
 function inspect(obj) {
   return util.inspect(obj, false, null, true);
@@ -23400,7 +23348,7 @@ function inspect(obj) {
 
 function createConfig(env = {}) {
   function parseMergeLabels(str, defaultValue) {
-    log("ERROR", "labels value is: " + str);
+    core.info("labels value is: " + str);
     const arr = (str == null ? defaultValue : str)
       .split(",")
       .map(s => s.trim());
@@ -23455,7 +23403,7 @@ function createConfig(env = {}) {
       return null;
     }
 
-    logger.info(`Parsing PULL_REQUEST input: ${pullRequest}`);
+    core.info(`Parsing PULL_REQUEST input: ${pullRequest}`);
 
     const error = new ClientError(
       `Invalid value provided for input PULL_REQUEST: ${pullRequest}. Must be a positive integer, optionally prefixed by a repo slug.`
@@ -23579,9 +23527,9 @@ async function retry(retries, retrySleep, doInitial, doRetry, doFailed) {
 
   for (let run = 1; run <= retries; run++) {
     if (retrySleep === 0) {
-      logger.info(`Retrying ... (${run}/${retries})`);
+      core.info(`Retrying ... (${run}/${retries})`);
     } else {
-      logger.info(`Retrying after ${retrySleep} ms ... (${run}/${retries})`);
+      core.info(`Retrying after ${retrySleep} ms ... (${run}/${retries})`);
       await sleep(retrySleep);
     }
 
@@ -23606,7 +23554,6 @@ function sleep(ms) {
 module.exports = {
   ClientError,
   TimeoutError,
-  logger,
   createConfig,
   tmpdir,
   inspect,
